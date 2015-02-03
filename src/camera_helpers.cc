@@ -251,6 +251,7 @@ int GPCamera::getCameraFile(take_picture_request *req, CameraFile **file) {
   int fd;
   if (!req->target_path.empty()) {
     char *tmpname = strdup(req->target_path.c_str());
+    // printf("path: %s\n", tmpname);
     fd = mkstemp(tmpname);
     req->target_path = tmpname;
   } else if (!req->socket_path.empty()) {
@@ -336,18 +337,34 @@ void GPCamera::downloadPicture(take_picture_request *req) {
 void GPCamera::capturePreview(take_picture_request *req) {
   int retval;
   CameraFile *file;
-
+  const char *data;
   retval = getCameraFile(req, &file);
 
   if (retval == GP_OK) {
+    if (!req->camera->functions->capture_preview) {
+      printf("This camera can not capture previews.");
+      gp_context_error(req->context, "This camera can not capture previews.");
+      req->ret = GP_ERROR_NOT_SUPPORTED;
+    }
     retval = gp_camera_capture_preview(req->camera, file, req->context);
+    printf("gp_camera_capture_preview: %s\n", gp_port_result_as_string(retval));
+  } else {
+    printf("oops: %s\n", gp_port_result_as_string(retval));
   }
-
   if (!req->target_path.empty() || !req->socket_path.empty()) {
-    gp_file_free(file);
+      gp_file_free(file);
   }
-
   req->ret = retval;
+
+  if (retval == GP_OK && req->target_path.empty()) {
+    retval = gp_file_get_data_and_size(file, &data, &req->length);
+    if (retval == GP_OK && req->length != 0) {
+      /* `gp_file_free` will call `free` on `file->data` pointer, save data */
+      req->data = new char[req->length];
+      memmove(const_cast<char *>(req->data), data, req->length);
+    }
+    data = NULL;
+  }
 }
 
 void GPCamera::takePicture(take_picture_request *req) {

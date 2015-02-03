@@ -35,7 +35,7 @@ describe "node-gphoto2", ()->
     cameras.length.should.be.above 0
 
   it 'should provide a list of settings', (done)->
-    @timeout 5000
+    @timeout 10000
     cameras[0].getConfig (er, settings)->
       try
         should.not.exist er

@@ -114,11 +114,30 @@ void GPCamera::Async_CaptureCb(uv_work_t *req, int status) {
   int argc = 1;
   argv[0] = Undefined();
   if (capture_req->ret != GP_OK) {
+    printf("GPCamera::Async_CaptureCb - 1");
     argv[0] = Integer::New(capture_req->ret);
   } else if (capture_req->download && !capture_req->target_path.empty()) {
+    printf("GPCamera::Async_CaptureCb - 2");
     argc = 2;
     argv[1] = String::New(capture_req->target_path.c_str());
   } else if (capture_req->data && capture_req->download) {
+    printf("GPCamera::Async_CaptureCb - 3");
+    argc = 2;
+    Local<Object> globalObj = Context::GetCurrent()->Global();
+    Local<Function> bufferConstructor =
+      Local<Function>::Cast(globalObj->Get(String::New("Buffer")));
+    Handle<Value> constructorArgs[1];
+    constructorArgs[0] = capture_req->length
+      ? Integer::New(capture_req->length)
+      : Integer::New(0);
+    Local<Object> buffer = bufferConstructor->NewInstance(1, constructorArgs);
+    if (capture_req->length) {
+      memmove(Buffer::Data(buffer), capture_req->data, capture_req->length);
+      delete capture_req->data;
+    }
+    argv[1] = buffer;
+  } else if (capture_req->data) {
+    printf("GPCamera::Async_CaptureCb - 4");
     argc = 2;
     Local<Object> globalObj = Context::GetCurrent()->Global();
     Local<Function> bufferConstructor =
@@ -134,6 +153,7 @@ void GPCamera::Async_CaptureCb(uv_work_t *req, int status) {
     }
     argv[1] = buffer;
   } else {
+    printf("GPCamera::Async_CaptureCb - 5");
     argc = 2;
     argv[1] = cv::CastToJS(capture_req->path);
   }
